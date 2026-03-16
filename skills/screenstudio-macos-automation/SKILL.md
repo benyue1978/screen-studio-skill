@@ -11,6 +11,8 @@ Use this skill when Screen Studio is the recorder and some other tool drives the
 
 Core principle: prefer Screen Studio URL schemes over shortcuts. Treat Screen Studio and the target app as two separate control loops, and treat target-window selection as the fragile part.
 
+Important correction: both `record-window` and `record-display` enter a selection state first. Neither one guarantees that recording has actually started until the pointer is moved onto the intended target and `Enter` is pressed.
+
 ## When to Use
 
 - Recording a browser or app automatically on macOS with Screen Studio
@@ -37,6 +39,16 @@ This workflow was validated against Screen Studio defaults on macOS:
 8. Drive the target app.
 9. Stop with `open 'screen-studio://finish-recording'`.
 
+For display recording:
+
+1. Launch Screen Studio.
+2. Make sure the intended display is known.
+3. Start display-recording mode with `open 'screen-studio://record-display'`.
+4. Move the mouse to the center of the intended display.
+5. Press `Enter` to confirm the highlighted display.
+6. Drive the target app.
+7. Stop with `open 'screen-studio://finish-recording'`.
+
 Important:
 
 - Do a full restart of the Screen Studio start flow after a missed attempt. Do not try to recover from a half-finished picker state.
@@ -46,6 +58,7 @@ Important:
   - `screen-studio://record-display`
   - `screen-studio://finish-recording`
 - Keep the old shortcut flow only as a fallback if a URL scheme stops working on the current Screen Studio version.
+- Do not assume `record-window` or `record-display` starts capture immediately. Both still require target confirmation.
 
 ## Focus Rules
 
@@ -53,6 +66,7 @@ Focus still matters, but less than before.
 
 - Before hovering the target window, explicitly activate the target app.
 - Before pressing `Enter`, make sure the target app is really frontmost.
+- For display recording, move the mouse to the intended display before pressing `Enter`.
 - If a URL scheme opens Screen Studio into the wrong state, restart the attempt instead of trying to repair the picker state.
 - If a fallback shortcut opens the wrong app or does nothing, assume the shortcut is intercepted on this Mac.
 
@@ -68,6 +82,7 @@ Use the bundled scripts instead of retyping the fragile focus and mouse logic:
 
 - `scripts/start-display-recording.sh`
   - Starts Screen Studio display-recording mode with `screen-studio://record-display`
+  - The caller must still move the mouse to the intended display center and confirm with `Enter`
 
 - `scripts/stop-recording.sh`
   - Stops with `screen-studio://finish-recording`
@@ -104,6 +119,8 @@ Never hardcode center coordinates except for one-off debugging. Always derive th
 For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. More generally, prefer app-specific window-discovery methods before falling back to generic Accessibility probing.
 
 Do not fall back to display recording too early. First exhaust app-specific or tool-specific ways to prove that a real desktop window exists and retrieve its live bounds.
+
+If you do fall back to display recording, apply the same rule: derive the intended target region first, move the mouse into that display's middle area, then confirm with `Enter`.
 
 ## Multi-Display Guidance
 
@@ -145,6 +162,13 @@ Start display recording:
 
 ```bash
 open 'screen-studio://record-display'
+```
+
+Confirm target display:
+
+```text
+move mouse to intended display center
+press Enter
 ```
 
 Activate target app:
@@ -191,8 +215,10 @@ open 'screen-studio://finish-recording'
 ## Common Mistakes
 
 - Reaching for shortcuts first when a URL scheme already exists
+- Assuming `record-window` or `record-display` means recording has already started
 - Clicking the transient button instead of using `Enter`
 - Hardcoding center coordinates instead of computing them from the live target window
+- Forgetting to move the mouse to the intended display center before confirming display recording
 - Trusting generic macOS window enumeration when the app's own protocol can provide exact window bounds
 - Falling back to display recording before exhausting app-specific window-discovery options
 - Continuing from a failed picker state instead of restarting
@@ -206,5 +232,6 @@ open 'screen-studio://finish-recording'
 - Target app is focused before hover
 - Pointer reaches target-window center
 - `Enter` confirms window selection
+- For display recording, the pointer reaches the intended display center before `Enter`
 - External tool drives visible activity
 - `screen-studio://finish-recording` ends the recording

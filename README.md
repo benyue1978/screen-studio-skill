@@ -13,6 +13,12 @@ The key idea is generic target-window discovery. Playwright and Google Chrome we
 - hover the target window center
 - confirm with `Enter`
 
+Important correction:
+
+- `screen-studio://record-window` and `screen-studio://record-display` both enter selection mode first
+- neither one means recording has actually started yet
+- you still need to move the mouse onto the intended target and press `Enter`
+
 ## Important Notes
 
 1. Prefer URL schemes over shortcuts.
@@ -30,6 +36,7 @@ The key idea is generic target-window discovery. Playwright and Google Chrome we
 - Before relying on automation, do one manual recording session in Screen Studio.
 - When the floating action appears for the selected window, change it from the default `Record and create project` behavior to `Record & Save`.
 - The automation assumes the window-selection step can then be confirmed with `Enter`.
+- For display recording, you still need to move the mouse to the intended display center and press `Enter`.
 
 3. After recording finishes, the file still needs to be named and saved manually.
 
