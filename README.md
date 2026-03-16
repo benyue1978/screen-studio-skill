@@ -4,6 +4,15 @@ This repo contains a reusable skill for automating Screen Studio on macOS:
 
 - [skills/screenstudio-macos-automation/SKILL.md](/Users/song.yue/git/screen-studio-skill/skills/screenstudio-macos-automation/SKILL.md)
 
+The key idea is generic target-window discovery. Playwright and Google Chrome were used during validation, but they are only examples. The reusable workflow is:
+
+- find the real target desktop window
+- get its live bounds
+- compute its center from those bounds
+- start Screen Studio window recording
+- hover the target window center
+- confirm with `Enter`
+
 ## Important Notes
 
 1. Make sure the Screen Studio shortcuts work on this Mac before trying automation.

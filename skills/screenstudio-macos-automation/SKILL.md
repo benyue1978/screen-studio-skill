@@ -79,7 +79,8 @@ Use the bundled scripts instead of retyping the fragile focus and mouse logic:
 
 - `scripts/get-chrome-window-bounds.js [url-substring]`
   - Uses AppleScript plus Chrome JavaScript to find a matching Chrome tab and report the front window bounds
-  - Useful for turning a browser target into center coordinates without relying on generic Accessibility window enumeration
+  - This is an example helper for one app, not the preferred universal interface
+  - Use it when Chrome is the target and no better window-discovery method is available
 
 Run scripts with `--help` or missing args first to see usage.
 
@@ -91,18 +92,26 @@ Recommended strategy:
 
 1. Discover the target window through the app's own automation API if available.
 2. Read native window bounds.
-3. If needed, move the window to a known location on the intended display.
-4. Hover the center of that window.
-5. Confirm with `Enter`.
+3. Compute the live center from those bounds.
+4. If needed, move the window to a known location on the intended display.
+5. Hover the center of that window.
+6. Confirm with `Enter`.
 
-For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. If those are not available, use targeted app-specific helpers before falling back to generic APIs.
+Never hardcode center coordinates except for one-off debugging. Always derive them from the current window:
+
+- `center_x = left + width / 2`
+- `center_y = top + height / 2`
+
+For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. More generally, prefer app-specific window-discovery methods before falling back to generic Accessibility probing.
+
+Do not fall back to display recording too early. First exhaust app-specific or tool-specific ways to prove that a real desktop window exists and retrieve its live bounds.
 
 ## Multi-Display Guidance
 
 Multi-display setups are the main source of failure.
 
 - Do not assume a newly launched browser or app opens on the intended display.
-- If the target app opens on the wrong monitor, move that one window first.
+- If the target app opens on the wrong monitor, move that one window first and then recompute the center from the new bounds.
 - If reliable window targeting is impossible, fall back to display recording only after placing the target window on the intended display.
 
 ## Example Tool Split
@@ -150,13 +159,20 @@ tell application "Google Chrome" to activate
 delay 1.5
 ```
 
+Compute live center from window bounds:
+
+```text
+center_x = left + width / 2
+center_y = top + height / 2
+```
+
 Move mouse to target-window center with Swift/CoreGraphics:
 
 ```swift
 import Foundation
 import CoreGraphics
 
-let p = CGPoint(x: 720, y: 530)
+let p = CGPoint(x: centerX, y: centerY)
 if let move = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: p, mouseButton: .left) {
   move.post(tap: .cghidEventTap)
 }
@@ -186,7 +202,9 @@ end tell
 - Sending Screen Studio shortcuts before Screen Studio is truly frontmost
 - Trying to use `Record single window` without first entering the global start flow
 - Clicking the transient button instead of using `Enter`
+- Hardcoding center coordinates instead of computing them from the live target window
 - Trusting generic macOS window enumeration when the app's own protocol can provide exact window bounds
+- Falling back to display recording before exhausting app-specific window-discovery options
 - Continuing from a failed picker state instead of restarting
 - Ignoring which display the target window actually opened on
 
