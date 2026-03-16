@@ -2,7 +2,7 @@
 
 This repo contains a reusable skill for automating Screen Studio on macOS:
 
-- [skills/screenstudio-macos-automation/SKILL.md](/Users/song.yue/git/screen-studio-skill/skills/screenstudio-macos-automation/SKILL.md)
+- `skills/screenstudio-macos-automation/SKILL.md`
 
 The key idea is generic target-window discovery. Playwright and Google Chrome were used during validation, but they are only examples. The reusable workflow is:
 
