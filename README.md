@@ -9,17 +9,20 @@ The key idea is generic target-window discovery. Playwright and Google Chrome we
 - find the real target desktop window
 - get its live bounds
 - compute its center from those bounds
-- start Screen Studio window recording
+- start Screen Studio window recording with URL scheme
 - hover the target window center
 - confirm with `Enter`
 
 ## Important Notes
 
-1. Make sure the Screen Studio shortcuts work on this Mac before trying automation.
+1. Prefer URL schemes over shortcuts.
 
-- The default `Start new Recording / Finish recording` shortcut is `Command + Control + Return`.
-- If that shortcut opens another app or does nothing, fix the shortcut conflict first.
-- Screen Studio automation will be unreliable until the shortcut reaches Screen Studio consistently.
+- Prefer:
+  - `screen-studio://record-window`
+  - `screen-studio://record-display`
+  - `screen-studio://finish-recording`
+- These are more reliable than keyboard shortcuts because they do not depend on shortcut conflicts.
+- Keep shortcuts only as a fallback if a URL scheme stops working on a given Screen Studio version.
 
 2. Use window recording, and configure the save behavior manually once.
 

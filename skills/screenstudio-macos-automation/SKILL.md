@@ -9,7 +9,7 @@ description: Use when automating Screen Studio on macOS for screen or window rec
 
 Use this skill when Screen Studio is the recorder and some other tool drives the app being recorded.
 
-Core principle: treat Screen Studio and the target app as two separate control loops. Screen Studio needs explicit focus before its shortcuts, and target-window selection is often the fragile part.
+Core principle: prefer Screen Studio URL schemes over shortcuts. Treat Screen Studio and the target app as two separate control loops, and treat target-window selection as the fragile part.
 
 ## When to Use
 
@@ -30,48 +30,47 @@ This workflow was validated against Screen Studio defaults on macOS:
 1. Launch Screen Studio.
 2. Launch the target application window to record.
 3. If the target window appears on the wrong display, move that one window to the intended display before recording starts.
-4. Activate Screen Studio and wait before sending its global shortcut.
-5. Start recording mode with `Command + Control + Return`.
-6. Re-activate Screen Studio and wait again.
-7. Switch to window recording with `Command + Option + 4`.
-8. Activate the target app.
-9. Move the mouse to the center of the target window.
-10. Press `Enter` to confirm the highlighted window.
-11. Drive the target app.
-12. Activate Screen Studio and stop with `Command + Control + Return`.
+4. Start window-recording mode with `open 'screen-studio://record-window'`.
+5. Activate the target app.
+6. Move the mouse to the center of the target window.
+7. Press `Enter` to confirm the highlighted window.
+8. Drive the target app.
+9. Stop with `open 'screen-studio://finish-recording'`.
 
 Important:
 
 - Do a full restart of the Screen Studio start flow after a missed attempt. Do not try to recover from a half-finished picker state.
-- On some setups, `Record single window` alone is not enough. The sequence must begin with the global `Start new Recording / Finish recording` shortcut first.
 - The `hover + Enter` pattern is more reliable than trying to click the transient `Record & Save` button.
+- Prefer URL schemes first:
+  - `screen-studio://record-window`
+  - `screen-studio://record-display`
+  - `screen-studio://finish-recording`
+- Keep the old shortcut flow only as a fallback if a URL scheme stops working on the current Screen Studio version.
 
 ## Focus Rules
 
-Focus is critical.
+Focus still matters, but less than before.
 
-- Before `Command + Control + Return`, explicitly activate Screen Studio and wait about 2 to 3 seconds.
-- Before `Command + Option + 4`, explicitly activate Screen Studio again and wait about 1 to 2 seconds.
 - Before hovering the target window, explicitly activate the target app.
-- Before stopping, activate Screen Studio again.
-
-If the start shortcut opens the wrong app or does nothing, assume the shortcut was intercepted or sent before Screen Studio was truly frontmost.
+- Before pressing `Enter`, make sure the target app is really frontmost.
+- If a URL scheme opens Screen Studio into the wrong state, restart the attempt instead of trying to repair the picker state.
+- If a fallback shortcut opens the wrong app or does nothing, assume the shortcut is intercepted on this Mac.
 
 ## Helper Scripts
 
 Use the bundled scripts instead of retyping the fragile focus and mouse logic:
 
 - `scripts/start-window-recording.sh "<App Name>" <center-x> <center-y>`
-  - Activates Screen Studio
-  - Starts recording flow
-  - Switches to window mode
+  - Starts Screen Studio window-recording mode with `screen-studio://record-window`
   - Activates the target app
   - Moves the mouse to the provided center point
   - Confirms with `Enter`
 
+- `scripts/start-display-recording.sh`
+  - Starts Screen Studio display-recording mode with `screen-studio://record-display`
+
 - `scripts/stop-recording.sh`
-  - Activates Screen Studio
-  - Stops with the default finish shortcut
+  - Stops with `screen-studio://finish-recording`
 
 - `scripts/move-mouse-to-point.sh <x> <y> [settle-seconds]`
   - Moves the pointer with CoreGraphics
@@ -138,18 +137,14 @@ delay 2.5
 
 Start recording flow:
 
-```applescript
-tell application "System Events"
-  keystroke return using {command down, control down}
-end tell
+```bash
+open 'screen-studio://record-window'
 ```
 
-Switch to window recording:
+Start display recording:
 
-```applescript
-tell application "System Events"
-  keystroke "4" using {command down, option down}
-end tell
+```bash
+open 'screen-studio://record-display'
 ```
 
 Activate target app:
@@ -189,18 +184,13 @@ end tell
 
 Stop recording:
 
-```applescript
-tell application "Screen Studio" to activate
-delay 1.5
-tell application "System Events"
-  keystroke return using {command down, control down}
-end tell
+```bash
+open 'screen-studio://finish-recording'
 ```
 
 ## Common Mistakes
 
-- Sending Screen Studio shortcuts before Screen Studio is truly frontmost
-- Trying to use `Record single window` without first entering the global start flow
+- Reaching for shortcuts first when a URL scheme already exists
 - Clicking the transient button instead of using `Enter`
 - Hardcoding center coordinates instead of computing them from the live target window
 - Trusting generic macOS window enumeration when the app's own protocol can provide exact window bounds
@@ -212,9 +202,9 @@ end tell
 
 - Screen Studio launches
 - Target window is known and visible
-- Screen Studio is focused before each of its shortcuts
+- The correct URL scheme opens the expected Screen Studio recording mode
 - Target app is focused before hover
 - Pointer reaches target-window center
 - `Enter` confirms window selection
 - External tool drives visible activity
-- Screen Studio is focused before stop
+- `screen-studio://finish-recording` ends the recording
