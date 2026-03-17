@@ -69,3 +69,19 @@ activate_app() {
   log_event "activate-app" "app=$app_name"
   osascript -e "tell application \"$app_name\" to activate"
 }
+
+activate_pid() {
+  local pid="$1"
+  local app_name="${2:-}"
+
+  swift -e "import AppKit
+let pid = pid_t($pid)
+if let app = NSRunningApplication(processIdentifier: pid) {
+  app.activate(options: [])
+}
+" || {
+    if [[ -n "$app_name" ]]; then
+      activate_app "$app_name"
+    fi
+  }
+}

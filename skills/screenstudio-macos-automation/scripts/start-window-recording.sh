@@ -6,7 +6,7 @@ if [[ "${1:-}" == "--help" || $# -lt 1 ]]; then
   echo "Example: $0 'Google Chrome playwright.dev'"
   echo "Starts Screen Studio window recording."
   echo "Requires at least one matching window."
-  echo "If multiple windows match, it chooses the first match in current window order."
+  echo "If multiple windows match, it filters out much smaller windows first and then chooses the first match in current global window order."
   echo "If the query matches zero windows, it exits with an error."
   exit 0
 fi

@@ -11,6 +11,7 @@ source "$script_dir/lib/mouse.sh"
 
 picker_delay="${SCREENSTUDIO_PICKER_DELAY:-1.2}"
 hover_settle="${SCREENSTUDIO_HOVER_SETTLE:-0.8}"
+window_area_ratio_threshold="${SCREENSTUDIO_WINDOW_AREA_RATIO_THRESHOLD:-0.1}"
 
 open_deeplink() {
   local url="$1"
@@ -38,12 +39,13 @@ run_selected_window() {
   local center_x="$3"
   local center_y="$4"
   local url
+  local app_pid="${id%%-*}"
 
   url="$(deeplink_url record-window)"
   log_event "selected-window" "id=$id" "app=$app_name" "center_x=$center_x" "center_y=$center_y"
   open_deeplink "$url"
   sleep "$picker_delay"
-  activate_app "$app_name"
+  activate_pid "$app_pid" "$app_name"
   sleep 0.4
   move_mouse_to_point window "$center_x" "$center_y" "$hover_settle"
   press_enter
@@ -72,6 +74,38 @@ print_window_matches() {
     [[ -z "$id" ]] && continue
     print -u2 -- "- $app_name | $title ($id) center=[$center_x,$center_y]"
   done <<< "$matches"
+}
+
+filter_large_windows() {
+  local records="$1"
+  local threshold="${2:-0.1}"
+  local record id app_name title x y width height center_x center_y
+  local area max_area keep_min_area
+  local -a lines
+
+  lines=("${(@f)${records:-}}")
+  (( ${#lines[@]} == 0 )) && return 0
+
+  max_area=0
+  for record in "${lines[@]}"; do
+    [[ -z "$record" ]] && continue
+    IFS=$'\t' read -r id app_name title x y width height center_x center_y <<< "$record"
+    area=$(( width * height ))
+    if (( area > max_area )); then
+      max_area=$area
+    fi
+  done
+
+  keep_min_area="$(awk -v max_area="$max_area" -v ratio="$threshold" 'BEGIN { printf "%.0f", max_area * ratio }')"
+
+  for record in "${lines[@]}"; do
+    [[ -z "$record" ]] && continue
+    IFS=$'\t' read -r id app_name title x y width height center_x center_y <<< "$record"
+    area=$(( width * height ))
+    if (( area >= keep_min_area )); then
+      print -r -- "$record"
+    fi
+  done
 }
 
 run_record_display() {
@@ -104,7 +138,7 @@ run_record_display() {
 }
 
 run_record_window() {
-  local query matches id app_name title center_x center_y count
+  local query matches filtered_matches id app_name title x y width height center_x center_y count filtered_count selected_record
 
   query="$(trim_whitespace "${1-}")"
   log_event "run-record-window" "query=$query"
@@ -122,7 +156,16 @@ run_record_window() {
     exit 1
   fi
 
-  IFS=$'\t' read -r id app_name title center_x center_y <<< "$(print -r -- "$matches" | sed -n '1p')"
+  filtered_matches="$(filter_large_windows "$(matching_window_records "$query")" "$window_area_ratio_threshold")"
+  filtered_count="$(match_count "$filtered_matches")"
+
+  if [[ "$filtered_count" != "0" ]]; then
+    selected_record="$(print -r -- "$filtered_matches" | sed -n '1p')"
+  else
+    selected_record="$(matching_window_records "$query" | sed -n '1p')"
+  fi
+
+  IFS=$'\t' read -r id app_name title x y width height center_x center_y <<< "$selected_record"
   run_selected_window "$id" "$app_name" "$center_x" "$center_y"
 }
 
@@ -139,7 +182,17 @@ run_simple_action() {
 }
 
 action_id="$(trim_whitespace "${1-}")"
-query="$(trim_whitespace "${2-}")"
+query=""
+shift || true
+
+case "$action_id" in
+  record-window)
+    query="$(trim_whitespace "${1-}")"
+    ;;
+  *)
+    query="$(trim_whitespace "${1-}")"
+    ;;
+esac
 
 case "$action_id" in
   record-display)

@@ -1,6 +1,6 @@
 ---
 name: screenstudio-macos-automation
-description: Use when automating Screen Studio on macOS for screen or window recording, especially when another tool drives the target app and Screen Studio must be coordinated through deeplinks, target discovery, mouse hover, and careful target-window selection.
+description: Use when automating Screen Studio on macOS for screen or window recording, especially when another tool drives the target app and Screen Studio must be coordinated through deeplinks, target discovery, mouse hover, and explicit target-window selection.
 ---
 
 # Screen Studio macOS Automation
@@ -9,22 +9,23 @@ description: Use when automating Screen Studio on macOS for screen or window rec
 
 Use this skill when Screen Studio is the recorder and some other tool drives the app being recorded.
 
-Core principle: prefer Screen Studio deeplinks over shortcuts. Treat Screen Studio and the target app as two separate control loops, and treat target discovery as the fragile part.
+Core principle: prefer Screen Studio deeplinks over shortcuts. Treat Screen Studio and the target app as two separate control loops, and make target discovery explicit.
 
 Important correction: both `record-window` and `record-display` enter a selection state first. Neither one guarantees that recording has actually started until the pointer is moved onto the intended target and `Enter` is pressed.
 
 Better strategy: do not treat recording start as a one-off helper call. Treat it as:
 
 1. discover candidate windows or displays
-2. for window recording, choose the first matching window in current z-order
-3. for display recording, require exactly one confident match
+2. for window recording, look across all instances of the application
+3. filter out much smaller windows before choosing by global window order
+4. for display recording, require exactly one confident match
 
 ## When to Use
 
 - Recording a browser or app automatically on macOS with Screen Studio
 - Another tool drives the app under test, such as Playwright, AppleScript, or a native app controller
 - Screen Studio has no stable public API for the task, so automation must use shortcuts, focus changes, mouse movement, and accessibility
-- Multi-display setups make display selection or target-window selection brittle
+- Multi-display setups require explicit display or window selection rules
 
 Do not use this skill when:
 
@@ -78,13 +79,14 @@ Focus still matters, but less than before.
 
 ## Helper Scripts
 
-Use the bundled scripts instead of retyping the fragile deeplink, focus, matching, and mouse logic:
+Use the bundled scripts instead of retyping the deeplink, focus, matching, and mouse logic:
 
 - `scripts/run_action.sh <action-id> [query]`
   - Preferred entry point
   - Supports `record-window`, `record-display`, and all simple Screen Studio deeplink actions
   - For `record-window`:
-    - if there are one or more matches, it chooses the first matching window in current z-order and auto-confirms it
+    - it looks across all visible windows for the application, including multiple app instances
+    - if there are one or more matches, it first filters out much smaller windows using a relative area threshold, then chooses the first matching window in current global window order
     - if there are zero matches, it exits non-zero
   - For `record-display`:
     - it still requires exactly one matching display
@@ -95,7 +97,8 @@ Use the bundled scripts instead of retyping the fragile deeplink, focus, matchin
   - Query can match app name, window title, or both
   - Example:
     - `Google Chrome playwright.dev`
-  - If multiple windows match, the first matching window in current z-order wins
+  - If multiple windows match, much smaller windows are filtered out first
+  - Then the first matching window in current global window order wins
 
 - `scripts/start-display-recording.sh [display-query]`
   - Convenience wrapper around `scripts/run_action.sh record-display "<query>"`
@@ -127,11 +130,12 @@ Recommended strategy:
 
 1. Discover candidate targets through the app's own automation API if available.
 2. Fall back to generic macOS window or display enumeration.
-3. For window recording, use the first matching window in current z-order.
-4. For display recording, require exactly one candidate match and fail otherwise.
-5. If needed, move the target window to a known location on the intended display before recomputing the center.
-6. Hover the center of the chosen target.
-7. Confirm with `Enter`.
+3. For window recording, enumerate all visible windows across application instances.
+4. Filter out windows whose area is much smaller than the largest candidate.
+5. For display recording, require exactly one candidate match and fail otherwise.
+6. If needed, move the target window to a known location on the intended display before recomputing the center.
+7. Hover the center of the chosen target.
+8. Confirm with `Enter`.
 
 Never hardcode center coordinates except for one-off debugging. Always derive them from the current window:
 
@@ -140,7 +144,7 @@ Never hardcode center coordinates except for one-off debugging. Always derive th
 
 For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. More generally, prefer app-specific discovery methods before falling back to generic Accessibility probing.
 
-For window recording, current window order is the tiebreaker when multiple matches exist. For display recording, do not auto-commit when multiple displays match.
+For window recording, use a global window list so multiple app instances are included, filter out much smaller windows, then use global window order as the tiebreaker. The default relative area threshold is `0.1`, configurable through `SCREENSTUDIO_WINDOW_AREA_RATIO_THRESHOLD`. For display recording, do not auto-commit when multiple displays match.
 
 Do not fall back to display recording too early. First exhaust app-specific or tool-specific ways to prove that a real desktop window exists and retrieve its live bounds.
 
@@ -179,6 +183,7 @@ delay 2.5
 Start recording flow:
 
 ```bash
+# open the target window with Playwright or another controller
 ./scripts/run_action.sh record-window "Google Chrome playwright.dev"
 ```
 
@@ -246,7 +251,8 @@ Stop recording:
 - Hardcoding center coordinates instead of computing them from the live target window
 - Forgetting to move the mouse to the intended display center before confirming display recording
 - Trusting generic macOS window enumeration when the app's own protocol can provide exact window bounds
-- Forgetting that window selection now prefers the first matching window in current z-order
+- Assuming one process view is enough when the application has multiple instances
+- Forgetting that window selection now filters out much smaller windows before using global window order
 - Falling back to display recording before exhausting app-specific window-discovery options
 - Continuing from a failed picker state instead of restarting
 - Ignoring which display the target window actually opened on
