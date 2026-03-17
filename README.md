@@ -8,7 +8,7 @@ The key idea is generic target discovery. Playwright and Google Chrome were used
 
 - discover candidate windows or displays
 - if exactly one candidate matches, compute its live center and auto-confirm it
-- if there is ambiguity, fall back to Screen Studio's picker instead of guessing
+- if there is ambiguity, fail instead of guessing
 - start Screen Studio recording with URL scheme
 - hover the chosen target center
 - confirm with `Enter`
@@ -60,5 +60,5 @@ Why this is better than the original one-off helpers:
 
 - it uses query-based target matching instead of hardcoded coordinates
 - it auto-confirms only when there is exactly one match
-- it safely falls back to the Screen Studio picker when matching is ambiguous
+- it fails loudly when matching is ambiguous, which is safer for AI callers
 - it keeps window recording and display recording under one consistent interface

@@ -17,7 +17,7 @@ Better strategy: do not treat recording start as a one-off helper call. Treat it
 
 1. discover candidate windows or displays
 2. if there is exactly one confident match, auto-confirm it
-3. otherwise open Screen Studio's picker and let the user choose manually
+3. otherwise fail loudly and refine the query
 
 ## When to Use
 
@@ -85,18 +85,19 @@ Use the bundled scripts instead of retyping the fragile deeplink, focus, matchin
   - Supports `record-window`, `record-display`, and all simple Screen Studio deeplink actions
   - For `record-window` and `record-display`:
     - if the query matches exactly one target, it auto-confirms by moving the mouse to the live center and pressing `Enter`
-    - otherwise it opens the Screen Studio picker for manual selection
+    - otherwise it exits non-zero and prints the matching candidates or a no-match error
 
 - `scripts/start-window-recording.sh "<query>"`
   - Convenience wrapper around `scripts/run_action.sh record-window "<query>"`
   - Query can match app name, window title, or both
   - Example:
     - `Google Chrome playwright.dev`
+  - Strict mode only: ambiguous matches are errors
 
 - `scripts/start-display-recording.sh [display-query]`
   - Convenience wrapper around `scripts/run_action.sh record-display "<query>"`
   - If exactly one display matches, it auto-confirms that display
-  - Otherwise it opens the Screen Studio picker for manual selection
+  - Otherwise it exits non-zero
 
 - `scripts/stop-recording.sh`
   - Stops with `screen-studio://finish-recording`
@@ -124,7 +125,7 @@ Recommended strategy:
 1. Discover candidate targets through the app's own automation API if available.
 2. Fall back to generic macOS window or display enumeration.
 3. If exactly one candidate matches, use its live center.
-4. If multiple candidates match or confidence is low, open Screen Studio's picker and let the user choose.
+4. If multiple candidates match or confidence is low, fail and refine the query.
 5. If needed, move the target window to a known location on the intended display before recomputing the center.
 6. Hover the center of the chosen target.
 7. Confirm with `Enter`.
@@ -136,7 +137,7 @@ Never hardcode center coordinates except for one-off debugging. Always derive th
 
 For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. More generally, prefer app-specific discovery methods before falling back to generic Accessibility probing.
 
-Do not auto-commit to a target when multiple windows or displays match. A safe manual picker is better than recording the wrong thing.
+Do not auto-commit to a target when multiple windows or displays match. For AI-facing scripts, fail instead of falling back to a manual picker.
 
 Do not fall back to display recording too early. First exhaust app-specific or tool-specific ways to prove that a real desktop window exists and retrieve its live bounds.
 

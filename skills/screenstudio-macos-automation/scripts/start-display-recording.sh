@@ -5,8 +5,8 @@ if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $0 [display-query]"
   echo "Example: $0 'Built-in Retina Display'"
   echo "Starts Screen Studio display recording."
-  echo "If one display matches the query, it moves the mouse to that display center and confirms with Enter."
-  echo "If there is no query or there are multiple matches, it opens the Screen Studio picker for manual selection."
+  echo "Requires exactly one matching display."
+  echo "If the query is missing or matches zero or multiple displays, it exits with an error."
   exit 0
 fi
 

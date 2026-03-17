@@ -2,6 +2,7 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
+script_path="$0"
 source "$script_dir/lib/common.sh"
 source "$script_dir/lib/deeplinks.sh"
 source "$script_dir/lib/windows.sh"
@@ -53,22 +54,49 @@ match_count() {
   print -r -- "$matches" | sed '/^$/d' | wc -l | tr -d ' '
 }
 
+print_display_matches() {
+  local matches="$1"
+  local id name center_x center_y
+
+  while IFS=$'\t' read -r id name center_x center_y; do
+    [[ -z "$id" ]] && continue
+    print -u2 -- "- $name ($id) center=[$center_x,$center_y]"
+  done <<< "$matches"
+}
+
+print_window_matches() {
+  local matches="$1"
+  local id app_name title center_x center_y
+
+  while IFS=$'\t' read -r id app_name title center_x center_y; do
+    [[ -z "$id" ]] && continue
+    print -u2 -- "- $app_name | $title ($id) center=[$center_x,$center_y]"
+  done <<< "$matches"
+}
+
 run_record_display() {
   local query matches id name center_x center_y count
 
   query="$(trim_whitespace "${1-}")"
   log_event "run-record-display" "query=$query"
   if [[ -z "$query" ]]; then
-    open_deeplink "$(deeplink_url record-display)"
-    return
+    print -u2 -- "record-display requires a display query in strict mode."
+    print -u2 -- "Example: $script_path record-display 'Built-in Retina Display'"
+    exit 1
   fi
 
   matches="$(match_displays "$query")"
   count="$(match_count "$matches")"
   log_event "display-match-count" "query=$query" "count=$count"
   if [[ "$count" != "1" ]]; then
-    open_deeplink "$(deeplink_url record-display)"
-    return
+    if [[ "$count" == "0" ]]; then
+      print -u2 -- "No displays matched query: $query"
+    else
+      print -u2 -- "Expected exactly 1 display match for query: $query"
+      print -u2 -- "Found $count matches:"
+      print_display_matches "$matches"
+    fi
+    exit 1
   fi
 
   IFS=$'\t' read -r id name center_x center_y <<< "$matches"
@@ -81,16 +109,23 @@ run_record_window() {
   query="$(trim_whitespace "${1-}")"
   log_event "run-record-window" "query=$query"
   if [[ -z "$query" ]]; then
-    open_deeplink "$(deeplink_url record-window)"
-    return
+    print -u2 -- "record-window requires a window query in strict mode."
+    print -u2 -- "Example: $script_path record-window 'Google Chrome playwright.dev'"
+    exit 1
   fi
 
   matches="$(match_windows "$query")"
   count="$(match_count "$matches")"
   log_event "window-match-count" "query=$query" "count=$count"
   if [[ "$count" != "1" ]]; then
-    open_deeplink "$(deeplink_url record-window)"
-    return
+    if [[ "$count" == "0" ]]; then
+      print -u2 -- "No windows matched query: $query"
+    else
+      print -u2 -- "Expected exactly 1 window match for query: $query"
+      print -u2 -- "Found $count matches:"
+      print_window_matches "$matches"
+    fi
+    exit 1
   fi
 
   IFS=$'\t' read -r id app_name title center_x center_y <<< "$matches"
