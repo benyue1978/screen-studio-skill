@@ -1,6 +1,6 @@
 ---
 name: screenstudio-macos-automation
-description: Use when automating Screen Studio on macOS for screen or window recording, especially when another tool drives the target app and Screen Studio must be controlled through focus changes, global shortcuts, mouse hover, and careful target-window selection.
+description: Use when automating Screen Studio on macOS for screen or window recording, especially when another tool drives the target app and Screen Studio must be coordinated through deeplinks, target discovery, mouse hover, and careful target-window selection.
 ---
 
 # Screen Studio macOS Automation
@@ -9,9 +9,15 @@ description: Use when automating Screen Studio on macOS for screen or window rec
 
 Use this skill when Screen Studio is the recorder and some other tool drives the app being recorded.
 
-Core principle: prefer Screen Studio URL schemes over shortcuts. Treat Screen Studio and the target app as two separate control loops, and treat target-window selection as the fragile part.
+Core principle: prefer Screen Studio deeplinks over shortcuts. Treat Screen Studio and the target app as two separate control loops, and treat target discovery as the fragile part.
 
 Important correction: both `record-window` and `record-display` enter a selection state first. Neither one guarantees that recording has actually started until the pointer is moved onto the intended target and `Enter` is pressed.
+
+Better strategy: do not treat recording start as a one-off helper call. Treat it as:
+
+1. discover candidate windows or displays
+2. if there is exactly one confident match, auto-confirm it
+3. otherwise open Screen Studio's picker and let the user choose manually
 
 ## When to Use
 
@@ -53,11 +59,11 @@ Important:
 
 - Do a full restart of the Screen Studio start flow after a missed attempt. Do not try to recover from a half-finished picker state.
 - The `hover + Enter` pattern is more reliable than trying to click the transient `Record & Save` button.
-- Prefer URL schemes first:
+- Prefer deeplinks first:
   - `screen-studio://record-window`
   - `screen-studio://record-display`
   - `screen-studio://finish-recording`
-- Keep the old shortcut flow only as a fallback if a URL scheme stops working on the current Screen Studio version.
+- Keep the old shortcut flow only as a fallback if a deeplink stops working on the current Screen Studio version.
 - Do not assume `record-window` or `record-display` starts capture immediately. Both still require target confirmation.
 
 ## Focus Rules
@@ -67,34 +73,45 @@ Focus still matters, but less than before.
 - Before hovering the target window, explicitly activate the target app.
 - Before pressing `Enter`, make sure the target app is really frontmost.
 - For display recording, move the mouse to the intended display before pressing `Enter`.
-- If a URL scheme opens Screen Studio into the wrong state, restart the attempt instead of trying to repair the picker state.
+- If a deeplink opens Screen Studio into the wrong state, restart the attempt instead of trying to repair the picker state.
 - If a fallback shortcut opens the wrong app or does nothing, assume the shortcut is intercepted on this Mac.
 
 ## Helper Scripts
 
-Use the bundled scripts instead of retyping the fragile focus and mouse logic:
+Use the bundled scripts instead of retyping the fragile deeplink, focus, matching, and mouse logic:
 
-- `scripts/start-window-recording.sh "<App Name>" <center-x> <center-y>`
-  - Starts Screen Studio window-recording mode with `screen-studio://record-window`
-  - Activates the target app
-  - Moves the mouse to the provided center point
-  - Confirms with `Enter`
+- `scripts/run_action.sh <action-id> [query]`
+  - Preferred entry point
+  - Supports `record-window`, `record-display`, and all simple Screen Studio deeplink actions
+  - For `record-window` and `record-display`:
+    - if the query matches exactly one target, it auto-confirms by moving the mouse to the live center and pressing `Enter`
+    - otherwise it opens the Screen Studio picker for manual selection
 
-- `scripts/start-display-recording.sh`
-  - Starts Screen Studio display-recording mode with `screen-studio://record-display`
-  - The caller must still move the mouse to the intended display center and confirm with `Enter`
+- `scripts/start-window-recording.sh "<query>"`
+  - Convenience wrapper around `scripts/run_action.sh record-window "<query>"`
+  - Query can match app name, window title, or both
+  - Example:
+    - `Google Chrome playwright.dev`
+
+- `scripts/start-display-recording.sh [display-query]`
+  - Convenience wrapper around `scripts/run_action.sh record-display "<query>"`
+  - If exactly one display matches, it auto-confirms that display
+  - Otherwise it opens the Screen Studio picker for manual selection
 
 - `scripts/stop-recording.sh`
   - Stops with `screen-studio://finish-recording`
 
-- `scripts/move-mouse-to-point.sh <x> <y> [settle-seconds]`
+- `scripts/move-mouse-to-point.sh <x> <y> [settle-seconds] [target-type]`
   - Moves the pointer with CoreGraphics
+  - Supports both `window` and `display` coordinate handling
   - Useful when a custom selection flow is needed
 
 - `scripts/get-chrome-window-bounds.js [url-substring]`
   - Uses AppleScript plus Chrome JavaScript to find a matching Chrome tab and report the front window bounds
   - This is an example helper for one app, not the preferred universal interface
   - Use it when Chrome is the target and no better window-discovery method is available
+
+The skill now favors a generic matcher-first workflow over app-specific one-off helpers.
 
 Run scripts with `--help` or missing args first to see usage.
 
@@ -104,19 +121,22 @@ Prefer window recording over display recording when possible, but only if the ta
 
 Recommended strategy:
 
-1. Discover the target window through the app's own automation API if available.
-2. Read native window bounds.
-3. Compute the live center from those bounds.
-4. If needed, move the window to a known location on the intended display.
-5. Hover the center of that window.
-6. Confirm with `Enter`.
+1. Discover candidate targets through the app's own automation API if available.
+2. Fall back to generic macOS window or display enumeration.
+3. If exactly one candidate matches, use its live center.
+4. If multiple candidates match or confidence is low, open Screen Studio's picker and let the user choose.
+5. If needed, move the target window to a known location on the intended display before recomputing the center.
+6. Hover the center of the chosen target.
+7. Confirm with `Enter`.
 
 Never hardcode center coordinates except for one-off debugging. Always derive them from the current window:
 
 - `center_x = left + width / 2`
 - `center_y = top + height / 2`
 
-For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. More generally, prefer app-specific window-discovery methods before falling back to generic Accessibility probing.
+For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. More generally, prefer app-specific discovery methods before falling back to generic Accessibility probing.
+
+Do not auto-commit to a target when multiple windows or displays match. A safe manual picker is better than recording the wrong thing.
 
 Do not fall back to display recording too early. First exhaust app-specific or tool-specific ways to prove that a real desktop window exists and retrieve its live bounds.
 
@@ -155,13 +175,13 @@ delay 2.5
 Start recording flow:
 
 ```bash
-open 'screen-studio://record-window'
+./scripts/run_action.sh record-window "Google Chrome playwright.dev"
 ```
 
 Start display recording:
 
 ```bash
-open 'screen-studio://record-display'
+./scripts/run_action.sh record-display "Built-in"
 ```
 
 Confirm target display:
@@ -209,17 +229,19 @@ end tell
 Stop recording:
 
 ```bash
-open 'screen-studio://finish-recording'
+./scripts/run_action.sh finish-recording
 ```
 
 ## Common Mistakes
 
-- Reaching for shortcuts first when a URL scheme already exists
+- Reaching for shortcuts first when a deeplink already exists
 - Assuming `record-window` or `record-display` means recording has already started
+- Treating target selection as a fixed-coordinate problem instead of a discovery-and-match problem
 - Clicking the transient button instead of using `Enter`
 - Hardcoding center coordinates instead of computing them from the live target window
 - Forgetting to move the mouse to the intended display center before confirming display recording
 - Trusting generic macOS window enumeration when the app's own protocol can provide exact window bounds
+- Auto-selecting a target even when there are multiple plausible matches
 - Falling back to display recording before exhausting app-specific window-discovery options
 - Continuing from a failed picker state instead of restarting
 - Ignoring which display the target window actually opened on
@@ -228,7 +250,7 @@ open 'screen-studio://finish-recording'
 
 - Screen Studio launches
 - Target window is known and visible
-- The correct URL scheme opens the expected Screen Studio recording mode
+- The correct deeplink opens the expected Screen Studio recording mode
 - Target app is focused before hover
 - Pointer reaches target-window center
 - `Enter` confirms window selection

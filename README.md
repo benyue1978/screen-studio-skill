@@ -4,13 +4,13 @@ This repo contains a reusable skill for automating Screen Studio on macOS:
 
 - `skills/screenstudio-macos-automation/SKILL.md`
 
-The key idea is generic target-window discovery. Playwright and Google Chrome were used during validation, but they are only examples. The reusable workflow is:
+The key idea is generic target discovery. Playwright and Google Chrome were used during validation, but they are only examples. The reusable workflow is:
 
-- find the real target desktop window
-- get its live bounds
-- compute its center from those bounds
-- start Screen Studio window recording with URL scheme
-- hover the target window center
+- discover candidate windows or displays
+- if exactly one candidate matches, compute its live center and auto-confirm it
+- if there is ambiguity, fall back to Screen Studio's picker instead of guessing
+- start Screen Studio recording with URL scheme
+- hover the chosen target center
 - confirm with `Enter`
 
 Important correction:
@@ -43,3 +43,22 @@ Important correction:
 - The current workflow automates starting recording, selecting the target window, driving the target app, and stopping recording.
 - It does not automate the final file naming or save dialog.
 - After Screen Studio stops recording, manually choose the file name and save location.
+
+## Better Script Entry Points
+
+The repo now includes a generic action runner:
+
+- `skills/screenstudio-macos-automation/scripts/run_action.sh`
+
+Recommended usage:
+
+- `./skills/screenstudio-macos-automation/scripts/run_action.sh record-window "Google Chrome playwright.dev"`
+- `./skills/screenstudio-macos-automation/scripts/run_action.sh record-display "Built-in"`
+- `./skills/screenstudio-macos-automation/scripts/run_action.sh finish-recording`
+
+Why this is better than the original one-off helpers:
+
+- it uses query-based target matching instead of hardcoded coordinates
+- it auto-confirms only when there is exactly one match
+- it safely falls back to the Screen Studio picker when matching is ambiguous
+- it keeps window recording and display recording under one consistent interface

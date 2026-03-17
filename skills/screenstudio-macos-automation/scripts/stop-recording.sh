@@ -7,4 +7,5 @@ if [[ "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-open 'screen-studio://finish-recording'
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+"$script_dir/run_action.sh" finish-recording
