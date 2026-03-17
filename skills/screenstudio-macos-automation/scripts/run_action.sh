@@ -117,18 +117,12 @@ run_record_window() {
   matches="$(match_windows "$query")"
   count="$(match_count "$matches")"
   log_event "window-match-count" "query=$query" "count=$count"
-  if [[ "$count" != "1" ]]; then
-    if [[ "$count" == "0" ]]; then
-      print -u2 -- "No windows matched query: $query"
-    else
-      print -u2 -- "Expected exactly 1 window match for query: $query"
-      print -u2 -- "Found $count matches:"
-      print_window_matches "$matches"
-    fi
+  if [[ "$count" == "0" ]]; then
+    print -u2 -- "No windows matched query: $query"
     exit 1
   fi
 
-  IFS=$'\t' read -r id app_name title center_x center_y <<< "$matches"
+  IFS=$'\t' read -r id app_name title center_x center_y <<< "$(print -r -- "$matches" | sed -n '1p')"
   run_selected_window "$id" "$app_name" "$center_x" "$center_y"
 }
 

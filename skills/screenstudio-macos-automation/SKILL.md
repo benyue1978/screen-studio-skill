@@ -16,8 +16,8 @@ Important correction: both `record-window` and `record-display` enter a selectio
 Better strategy: do not treat recording start as a one-off helper call. Treat it as:
 
 1. discover candidate windows or displays
-2. if there is exactly one confident match, auto-confirm it
-3. otherwise fail loudly and refine the query
+2. for window recording, choose the first matching window in current z-order
+3. for display recording, require exactly one confident match
 
 ## When to Use
 
@@ -83,16 +83,19 @@ Use the bundled scripts instead of retyping the fragile deeplink, focus, matchin
 - `scripts/run_action.sh <action-id> [query]`
   - Preferred entry point
   - Supports `record-window`, `record-display`, and all simple Screen Studio deeplink actions
-  - For `record-window` and `record-display`:
-    - if the query matches exactly one target, it auto-confirms by moving the mouse to the live center and pressing `Enter`
-    - otherwise it exits non-zero and prints the matching candidates or a no-match error
+  - For `record-window`:
+    - if there are one or more matches, it chooses the first matching window in current z-order and auto-confirms it
+    - if there are zero matches, it exits non-zero
+  - For `record-display`:
+    - it still requires exactly one matching display
+    - otherwise it exits non-zero
 
 - `scripts/start-window-recording.sh "<query>"`
   - Convenience wrapper around `scripts/run_action.sh record-window "<query>"`
   - Query can match app name, window title, or both
   - Example:
     - `Google Chrome playwright.dev`
-  - Strict mode only: ambiguous matches are errors
+  - If multiple windows match, the first matching window in current z-order wins
 
 - `scripts/start-display-recording.sh [display-query]`
   - Convenience wrapper around `scripts/run_action.sh record-display "<query>"`
@@ -124,8 +127,8 @@ Recommended strategy:
 
 1. Discover candidate targets through the app's own automation API if available.
 2. Fall back to generic macOS window or display enumeration.
-3. If exactly one candidate matches, use its live center.
-4. If multiple candidates match or confidence is low, fail and refine the query.
+3. For window recording, use the first matching window in current z-order.
+4. For display recording, require exactly one candidate match and fail otherwise.
 5. If needed, move the target window to a known location on the intended display before recomputing the center.
 6. Hover the center of the chosen target.
 7. Confirm with `Enter`.
@@ -137,7 +140,7 @@ Never hardcode center coordinates except for one-off debugging. Always derive th
 
 For browser-based automation, DevTools window bounds are often more reliable than generic macOS accessibility window listings. More generally, prefer app-specific discovery methods before falling back to generic Accessibility probing.
 
-Do not auto-commit to a target when multiple windows or displays match. For AI-facing scripts, fail instead of falling back to a manual picker.
+For window recording, current window order is the tiebreaker when multiple matches exist. For display recording, do not auto-commit when multiple displays match.
 
 Do not fall back to display recording too early. First exhaust app-specific or tool-specific ways to prove that a real desktop window exists and retrieve its live bounds.
 
@@ -238,11 +241,12 @@ Stop recording:
 - Reaching for shortcuts first when a deeplink already exists
 - Assuming `record-window` or `record-display` means recording has already started
 - Treating target selection as a fixed-coordinate problem instead of a discovery-and-match problem
+- Assuming display-selection rules and window-selection rules should be identical
 - Clicking the transient button instead of using `Enter`
 - Hardcoding center coordinates instead of computing them from the live target window
 - Forgetting to move the mouse to the intended display center before confirming display recording
 - Trusting generic macOS window enumeration when the app's own protocol can provide exact window bounds
-- Auto-selecting a target even when there are multiple plausible matches
+- Forgetting that window selection now prefers the first matching window in current z-order
 - Falling back to display recording before exhausting app-specific window-discovery options
 - Continuing from a failed picker state instead of restarting
 - Ignoring which display the target window actually opened on

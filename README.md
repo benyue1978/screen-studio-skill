@@ -7,8 +7,8 @@ This repo contains a reusable skill for automating Screen Studio on macOS:
 The key idea is generic target discovery. Playwright and Google Chrome were used during validation, but they are only examples. The reusable workflow is:
 
 - discover candidate windows or displays
-- if exactly one candidate matches, compute its live center and auto-confirm it
-- if there is ambiguity, fail instead of guessing
+- for window recording, choose the first matching window in current z-order
+- for display recording, require exactly one matching display
 - start Screen Studio recording with URL scheme
 - hover the chosen target center
 - confirm with `Enter`
@@ -59,6 +59,6 @@ Recommended usage:
 Why this is better than the original one-off helpers:
 
 - it uses query-based target matching instead of hardcoded coordinates
-- it auto-confirms only when there is exactly one match
-- it fails loudly when matching is ambiguous, which is safer for AI callers
+- it auto-confirms the first matching window in current z-order
+- it keeps display selection strict, so multi-display ambiguity still fails loudly
 - it keeps window recording and display recording under one consistent interface
